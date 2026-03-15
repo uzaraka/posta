@@ -1,0 +1,82 @@
+/*
+ *  MIT License
+ *
+ * Copyright (c) 2026 Jonas Kaninda
+ *
+ *  Permission is hereby granted, free of charge, to any person obtaining a copy
+ *  of this software and associated documentation files (the "Software"), to deal
+ *  in the Software without restriction, including without limitation the rights
+ *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *  copies of the Software, and to permit persons to whom the Software is
+ *  furnished to do so, subject to the following conditions:
+ *
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ *  SOFTWARE.
+ */
+
+package email
+
+import (
+	"html"
+	"regexp"
+	"strings"
+)
+
+// HTMLToText converts an HTML string to readable plain text.
+// It strips tags, converts common block elements to appropriate whitespace,
+// extracts link URLs, and decodes HTML entities.
+func HTMLToText(input string) string {
+	if input == "" {
+		return ""
+	}
+
+	s := input
+
+	// Convert <br>, <br/>, <br /> to newlines
+	brRe := regexp.MustCompile(`(?i)<br\s*/?>`)
+	s = brRe.ReplaceAllString(s, "\n")
+
+	// Convert </p> to double newlines
+	closePRe := regexp.MustCompile(`(?i)</p\s*>`)
+	s = closePRe.ReplaceAllString(s, "\n\n")
+
+	// Convert <p ...> to double newlines (except the very first one)
+	openPRe := regexp.MustCompile(`(?i)<p[^>]*>`)
+	s = openPRe.ReplaceAllString(s, "\n\n")
+
+	// Convert <li> to "- " prefix
+	liRe := regexp.MustCompile(`(?i)<li[^>]*>`)
+	s = liRe.ReplaceAllString(s, "\n- ")
+
+	// Convert <a href="url">text</a> to "text (url)"
+	linkRe := regexp.MustCompile(`(?i)<a\s[^>]*href\s*=\s*["']([^"']*)["'][^>]*>(.*?)</a>`)
+	s = linkRe.ReplaceAllString(s, "$2 ($1)")
+
+	// Strip all remaining HTML tags
+	tagRe := regexp.MustCompile(`<[^>]*>`)
+	s = tagRe.ReplaceAllString(s, "")
+
+	// Decode HTML entities (handles &amp;, &lt;, &gt;, &nbsp;, &#xxxx; etc.)
+	s = strings.ReplaceAll(s, "&nbsp;", " ")
+	s = html.UnescapeString(s)
+
+	// Collapse runs of spaces/tabs on each line (preserve newlines)
+	spaceRe := regexp.MustCompile(`[^\S\n]+`)
+	s = spaceRe.ReplaceAllString(s, " ")
+
+	// Collapse 3+ consecutive newlines into 2
+	nlRe := regexp.MustCompile(`\n{3,}`)
+	s = nlRe.ReplaceAllString(s, "\n\n")
+
+	s = strings.TrimSpace(s)
+
+	return s
+}

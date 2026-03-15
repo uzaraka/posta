@@ -1,0 +1,310 @@
+/*
+ *  MIT License
+ *
+ * Copyright (c) 2026 Jonas Kaninda
+ *
+ *  Permission is hereby granted, free of charge, to any person obtaining a copy
+ *  of this software and associated documentation files (the "Software"), to deal
+ *  in the Software without restriction, including without limitation the rights
+ *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *  copies of the Software, and to permit persons to whom the Software is
+ *  furnished to do so, subject to the following conditions:
+ *
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ *  SOFTWARE.
+ */
+
+package handlers
+
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/jkaninda/okapi"
+	"github.com/jkaninda/posta/internal/models"
+	"github.com/jkaninda/posta/internal/services/audit"
+	"github.com/jkaninda/posta/internal/services/email"
+	"github.com/jkaninda/posta/internal/storage/repositories"
+)
+
+type SMTPHandler struct {
+	repo       *repositories.SMTPRepository
+	domainRepo *repositories.DomainRepository
+	sender     *email.SMTPSender
+	audit      *audit.Logger
+}
+type CreateSMTPRequest struct {
+	Body struct {
+		Host          string   `json:"host" required:"true"`
+		Port          int      `json:"port" required:"true"`
+		Username      string   `json:"username"`
+		Password      string   `json:"password"`
+		Encryption    string   `json:"encryption"`
+		MaxRetries    int      `json:"max_retries"`
+		AllowedEmails []string `json:"allowed_emails"`
+	} `json:"body"`
+}
+type UpdateSMTPRequest struct {
+	ID   int `param:"id"`
+	Body struct {
+		Host          string   `json:"host"`
+		Port          int      `json:"port"`
+		Username      string   `json:"username"`
+		Password      string   `json:"password"`
+		Encryption    string   `json:"encryption"`
+		MaxRetries    *int     `json:"max_retries"`
+		AllowedEmails []string `json:"allowed_emails"`
+		Status        string   `json:"status"`
+	} `json:"body"`
+}
+type GetSMTPRequest struct {
+	ID int `param:"id"`
+}
+type DeleteSMTPRequest struct {
+	ID int `param:"id"`
+}
+type TestSMTPRequest struct {
+	ID int `param:"id"`
+}
+
+func NewSMTPHandler(repo *repositories.SMTPRepository, domainRepo *repositories.DomainRepository, audit *audit.Logger) *SMTPHandler {
+	return &SMTPHandler{repo: repo, domainRepo: domainRepo, sender: email.NewSMTPSender(), audit: audit}
+}
+
+// validateAllowedEmails checks that each allowed email's domain belongs to the user's domains.
+// If the user has no domains configured, all emails are allowed.
+func (h *SMTPHandler) validateAllowedEmails(userID uint, emails []string) error {
+	if len(emails) == 0 {
+		return nil
+	}
+
+	domains, _, err := h.domainRepo.FindByUserID(userID, 1000, 0)
+	if err != nil {
+		return fmt.Errorf("failed to load domains")
+	}
+
+	// If user has no domains, skip validation
+	if len(domains) == 0 {
+		return nil
+	}
+
+	domainSet := make(map[string]bool, len(domains))
+	for _, d := range domains {
+		domainSet[strings.ToLower(d.Domain)] = true
+	}
+
+	for _, addr := range emails {
+		parts := strings.SplitN(addr, "@", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid email address: %s", addr)
+		}
+		domain := strings.ToLower(parts[1])
+		if !domainSet[domain] {
+			return fmt.Errorf("domain %q is not in your verified domains", domain)
+		}
+	}
+	return nil
+}
+
+func (h *SMTPHandler) Create(c *okapi.Context, req *CreateSMTPRequest) error {
+	userID := c.GetInt("user_id")
+
+	if err := h.validateAllowedEmails(uint(userID), req.Body.AllowedEmails); err != nil {
+		return c.AbortBadRequest(err.Error())
+	}
+
+	encryption := req.Body.Encryption
+	if encryption == "" {
+		encryption = models.EncryptionNone
+	}
+
+	server := &models.SMTPServer{
+		UserID:        uint(userID),
+		Host:          req.Body.Host,
+		Port:          req.Body.Port,
+		Username:      req.Body.Username,
+		Password:      req.Body.Password,
+		Encryption:    encryption,
+		MaxRetries:    req.Body.MaxRetries,
+		AllowedEmails: req.Body.AllowedEmails,
+	}
+
+	// Validate SMTP connection before saving
+	now := time.Now()
+	server.ValidatedAt = &now
+	if err := h.sender.TestConnection(server); err != nil {
+		server.Status = models.SMTPStatusInvalid
+		server.ValidationError = err.Error()
+	} else {
+		server.Status = models.SMTPStatusEnabled
+		server.ValidationError = ""
+	}
+
+	if err := h.repo.Create(server); err != nil {
+		return c.AbortInternalServerError("failed to create SMTP server", err)
+	}
+
+	h.audit.Log(uint(userID), c.GetString("email"), c.RealIP(), "smtp.created", "SMTP server created: "+req.Body.Host, nil)
+
+	return created(c, server)
+}
+
+func (h *SMTPHandler) Get(c *okapi.Context, req *GetSMTPRequest) error {
+	userID := c.GetInt("user_id")
+
+	server, err := h.repo.FindByID(uint(req.ID))
+	if err != nil || server.UserID != uint(userID) {
+		return c.AbortNotFound("SMTP server not found")
+	}
+
+	return ok(c, server)
+}
+
+func (h *SMTPHandler) Update(c *okapi.Context, req *UpdateSMTPRequest) error {
+	userID := c.GetInt("user_id")
+
+	server, err := h.repo.FindByID(uint(req.ID))
+	if err != nil || server.UserID != uint(userID) {
+		return c.AbortNotFound("SMTP server not found")
+	}
+
+	// Track whether connection-related fields changed
+	connectionChanged := false
+
+	if req.Body.Host != "" && req.Body.Host != server.Host {
+		server.Host = req.Body.Host
+		connectionChanged = true
+	}
+	if req.Body.Port != 0 && req.Body.Port != server.Port {
+		server.Port = req.Body.Port
+		connectionChanged = true
+	}
+	if req.Body.Username != "" && req.Body.Username != server.Username {
+		server.Username = req.Body.Username
+		connectionChanged = true
+	}
+	if req.Body.Password != "" {
+		server.Password = req.Body.Password
+		connectionChanged = true
+	}
+	if req.Body.Encryption != "" && req.Body.Encryption != server.Encryption {
+		server.Encryption = req.Body.Encryption
+		connectionChanged = true
+	}
+	if req.Body.MaxRetries != nil {
+		server.MaxRetries = *req.Body.MaxRetries
+	}
+	if req.Body.AllowedEmails != nil {
+		if err := h.validateAllowedEmails(uint(userID), req.Body.AllowedEmails); err != nil {
+			return c.AbortBadRequest(err.Error())
+		}
+		server.AllowedEmails = req.Body.AllowedEmails
+	}
+
+	// Handle status changes
+	if req.Body.Status != "" {
+		switch req.Body.Status {
+		case models.SMTPStatusDisabled:
+			server.Status = models.SMTPStatusDisabled
+			server.ValidationError = ""
+		case models.SMTPStatusEnabled:
+			// Re-validate before enabling
+			now := time.Now()
+			server.ValidatedAt = &now
+			if err := h.sender.TestConnection(server); err != nil {
+				server.Status = models.SMTPStatusInvalid
+				server.ValidationError = err.Error()
+			} else {
+				server.Status = models.SMTPStatusEnabled
+				server.ValidationError = ""
+			}
+		}
+	} else if connectionChanged {
+		// Connection fields changed — re-validate automatically
+		now := time.Now()
+		server.ValidatedAt = &now
+		if err := h.sender.TestConnection(server); err != nil {
+			server.Status = models.SMTPStatusInvalid
+			server.ValidationError = err.Error()
+		} else {
+			server.Status = models.SMTPStatusEnabled
+			server.ValidationError = ""
+		}
+	}
+
+	if err := h.repo.Update(server); err != nil {
+		return c.AbortInternalServerError("failed to update SMTP server")
+	}
+
+	h.audit.Log(uint(userID), c.GetString("email"), c.RealIP(), "smtp.updated", "SMTP server updated: "+server.Host, nil)
+
+	return ok(c, server)
+}
+
+func (h *SMTPHandler) List(c *okapi.Context, req *ListRequest) error {
+	userID := c.GetInt("user_id")
+	page, size, offset := normalizePageParams(req.Page, req.Size)
+
+	servers, total, err := h.repo.FindByUserID(uint(userID), size, offset)
+	if err != nil {
+		return c.AbortInternalServerError("failed to list SMTP servers")
+	}
+
+	return paginated(c, servers, total, page, size)
+}
+
+func (h *SMTPHandler) Delete(c *okapi.Context, req *DeleteSMTPRequest) error {
+	userID := c.GetInt("user_id")
+
+	server, err := h.repo.FindByID(uint(req.ID))
+	if err != nil || server.UserID != uint(userID) {
+		return c.AbortNotFound("SMTP server not found")
+	}
+
+	if err := h.repo.Delete(server.ID); err != nil {
+		return c.AbortInternalServerError("failed to delete SMTP server")
+	}
+
+	h.audit.Log(uint(userID), c.GetString("email"), c.RealIP(), "smtp.deleted", "SMTP server deleted: "+server.Host, nil)
+
+	return noContent(c)
+}
+
+func (h *SMTPHandler) Test(c *okapi.Context, req *TestSMTPRequest) error {
+	userID := c.GetInt("user_id")
+
+	server, err := h.repo.FindByID(uint(req.ID))
+	if err != nil || server.UserID != uint(userID) {
+		return c.AbortNotFound("SMTP server not found")
+	}
+
+	now := time.Now()
+	if err := h.sender.TestConnection(server); err != nil {
+		// Update validation state on test failure
+		_ = h.repo.SetStatus(server.ID, models.SMTPStatusInvalid, err.Error())
+		return ok(c, okapi.M{
+			"success":      false,
+			"message":      err.Error(),
+			"status":       models.SMTPStatusInvalid,
+			"validated_at": now,
+		})
+	}
+
+	// Update validation state on test success
+	_ = h.repo.SetStatus(server.ID, models.SMTPStatusEnabled, "")
+	return ok(c, okapi.M{
+		"success":      true,
+		"message":      "connection successful",
+		"status":       models.SMTPStatusEnabled,
+		"validated_at": now,
+	})
+}

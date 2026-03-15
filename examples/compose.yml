@@ -1,0 +1,58 @@
+# Posta Deployment (Single container Worker Setup)
+# ==================================================
+# This configuration runs Posta with the embedded worker enabled.
+# The email processing worker runs inside the main Posta server process,
+# so no separate worker container is required. This setup is ideal for
+# simple deployments, development environments, or small installations.
+
+services:
+  posta:
+    image: jkaninda/posta:latest
+    ports:
+      - "9000:9000"
+    environment:
+      POSTA_DB_HOST: posta-db
+      POSTA_DB_NAME: posta
+      POSTA_DB_USER: posta
+      POSTA_DB_PASSWORD: posta
+      POSTA_DB_PORT: 5432
+      POSTA_DB_SSL_MODE: disable
+      POSTA_REDIS_ADDR: "posta-redis:6379"
+      POSTA_JWT_SECRET: "change-me-in-production"
+      POSTA_ADMIN_EMAIL: "admin@example.com"
+      POSTA_ADMIN_PASSWORD: "admin1234"
+      POSTA_EMBEDDED_WORKER: "true"
+    depends_on:
+      posta-db:
+        condition: service_healthy
+      posta-redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  posta-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: posta
+      POSTGRES_PASSWORD: posta
+      POSTGRES_DB: posta
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U posta"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  posta-redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
