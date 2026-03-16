@@ -234,10 +234,6 @@ func (r *Router) registerRoutes() {
 	r.app.Register(r.adminRoutes()...)
 	r.app.Register(r.adminSSERoutes()...)
 
-	if r.cfg.DevMode {
-		r.app.Register(r.devRoutes()...)
-	}
-
 	// Dashboard UI (static files + SPA fallback)
 	webDir := r.cfg.WebDir
 	if info, err := os.Stat(webDir); err == nil && info.IsDir() {
