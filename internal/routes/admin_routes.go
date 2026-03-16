@@ -344,34 +344,3 @@ func (r *Router) adminSSERoutes() []okapi.RouteDefinition {
 		},
 	}
 }
-
-// devRoutes returns route definitions for development-only endpoints.
-func (r *Router) devRoutes() []okapi.RouteDefinition {
-	devGroup := r.v1.Group("/dev").WithTags([]string{"Dev"})
-
-	return []okapi.RouteDefinition{
-		{
-			Method:      http.MethodGet,
-			Path:        "/emails",
-			Handler:     okapi.H(r.h.email.DevList),
-			Group:       devGroup,
-			Summary:     "List all emails (dev)",
-			Description: "List all stored emails across all users. Only available in development mode.",
-			Request:     &handlers.ListRequest{},
-			Response:    &dto.PageableResponse[models.Email]{},
-		},
-		{
-			Method:      http.MethodGet,
-			Path:        "/emails/{id}",
-			Handler:     r.h.email.DevGet,
-			Group:       devGroup,
-			Summary:     "Get email (dev)",
-			Description: "Get email details by UUID. Only available in development mode.",
-			Response:    &dto.Response[models.Email]{},
-			Options: []okapi.RouteOption{
-				okapi.DocPathParam("id", "string", "Email UUID"),
-				okapi.DocErrorResponse(404, &dto.ErrorResponseBody{}),
-			},
-		},
-	}
-}
