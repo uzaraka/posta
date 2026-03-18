@@ -190,6 +190,145 @@ type BatchResult struct {
 	Error  string             `json:"error,omitempty"`
 }
 
+// DryRunResponse is returned when a send request is validated without actually sending.
+type DryRunResponse struct {
+	Valid            bool     `json:"valid"`
+	From             string   `json:"from"`
+	To               []string `json:"to"`
+	Subject          string   `json:"subject"`
+	Recipients       int      `json:"recipients"`
+	SuppressedCount  int      `json:"suppressed_count"`
+	AttachmentCount  int      `json:"attachment_count"`
+	HasHTML          bool     `json:"has_html"`
+	HasText          bool     `json:"has_text"`
+	RenderedSubject  string   `json:"rendered_subject,omitempty"`
+}
+
+// ValidateSend runs all validation checks without persisting or sending.
+func (s *Service) ValidateSend(ctx context.Context, userID uint, userEmail string, req *SendRequest) (*DryRunResponse, error) {
+	if s.settings != nil && s.settings.MaintenanceMode() {
+		return nil, fmt.Errorf("maintenance: email sending is temporarily disabled")
+	}
+
+	if err := s.limiter.Check(ctx, userEmail); err != nil {
+		return nil, fmt.Errorf("rate_limit: %w", err)
+	}
+
+	if len(req.Attachments) > 0 {
+		maxSize := DefaultMaxAttachmentSize
+		if s.settings != nil {
+			maxSize = int64(s.settings.MaxAttachmentSizeMB()) * 1024 * 1024
+		}
+		if err := ValidateAttachments(req.Attachments, maxSize, DefaultMaxTotalSize); err != nil {
+			return nil, fmt.Errorf("attachment validation: %w", err)
+		}
+	}
+
+	if err := s.checkDomainVerification(userID, req.From); err != nil {
+		return nil, err
+	}
+
+	activeRecipients := req.To
+	suppressedCount := 0
+	if s.suppressionRepo != nil {
+		filtered, err := s.suppressionRepo.FilterSuppressed(userID, req.To)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check suppression list: %w", err)
+		}
+		suppressedCount = len(req.To) - len(filtered)
+		activeRecipients = filtered
+	}
+
+	return &DryRunResponse{
+		Valid:           true,
+		From:            req.From,
+		To:              activeRecipients,
+		Subject:         req.Subject,
+		Recipients:      len(activeRecipients),
+		SuppressedCount: suppressedCount,
+		AttachmentCount: len(req.Attachments),
+		HasHTML:         req.HTML != "",
+		HasText:         req.Text != "",
+	}, nil
+}
+
+// ValidateSendWithTemplate validates a template send request without sending.
+func (s *Service) ValidateSendWithTemplate(ctx context.Context, userID uint, userEmail string, req *SendTemplateRequest) (*DryRunResponse, error) {
+	tmpl, err := s.templateRepo.FindByName(userID, req.Template)
+	if err != nil {
+		return nil, fmt.Errorf("template not found: %s", req.Template)
+	}
+
+	rendered, err := s.resolveAndRender(tmpl, req.Language, req.TemplateData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render template: %w", err)
+	}
+
+	from := req.From
+	if from == "" {
+		from = defaultFromAddress
+	}
+
+	resp, err := s.ValidateSend(ctx, userID, userEmail, &SendRequest{
+		From:        from,
+		To:          req.To,
+		Subject:     rendered.Subject,
+		HTML:        rendered.HTML,
+		Text:        rendered.Text,
+		Attachments: req.Attachments,
+	})
+	if err != nil {
+		return nil, err
+	}
+	resp.RenderedSubject = rendered.Subject
+	return resp, nil
+}
+
+// ValidateSendBatch validates a batch send request without sending.
+func (s *Service) ValidateSendBatch(ctx context.Context, userID uint, userEmail string, req *BatchRequest) (*DryRunResponse, error) {
+	if s.settings != nil {
+		maxBatch := s.settings.MaxBatchSize()
+		if maxBatch > 0 && len(req.Recipients) > maxBatch {
+			return nil, fmt.Errorf("batch size %d exceeds maximum allowed (%d)", len(req.Recipients), maxBatch)
+		}
+	}
+
+	_, err := s.templateRepo.FindByName(userID, req.Template)
+	if err != nil {
+		return nil, fmt.Errorf("template not found: %s", req.Template)
+	}
+
+	from := req.From
+	if from == "" {
+		from = defaultFromAddress
+	}
+
+	emails := make([]string, len(req.Recipients))
+	for i, r := range req.Recipients {
+		emails[i] = r.Email
+	}
+
+	activeRecipients := emails
+	suppressedCount := 0
+	if s.suppressionRepo != nil {
+		filtered, err := s.suppressionRepo.FilterSuppressed(userID, emails)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check suppression list: %w", err)
+		}
+		suppressedCount = len(emails) - len(filtered)
+		activeRecipients = filtered
+	}
+
+	return &DryRunResponse{
+		Valid:           true,
+		From:            from,
+		To:              activeRecipients,
+		Subject:         req.Template,
+		Recipients:      len(activeRecipients),
+		SuppressedCount: suppressedCount,
+	}, nil
+}
+
 func (s *Service) Send(ctx context.Context, userID, apiKeyID uint, userEmail string, req *SendRequest) (*SendResponse, error) {
 	// Enforce maintenance mode
 	if s.settings != nil && s.settings.MaintenanceMode() {

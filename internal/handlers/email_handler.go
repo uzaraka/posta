@@ -45,13 +45,16 @@ type EmailHandler struct {
 	settings  *settings.Provider
 }
 type SendEmailRequest struct {
-	Body email.SendRequest `json:"body"`
+	DryRun bool              `query:"dry_run" doc:"Validate the request without sending"`
+	Body   email.SendRequest `json:"body"`
 }
 type SendTemplateEmailRequest struct {
-	Body email.SendTemplateRequest `json:"body"`
+	DryRun bool                      `query:"dry_run"`
+	Body   email.SendTemplateRequest `json:"body"`
 }
 type SendBatchEmailRequest struct {
-	Body email.BatchRequest `json:"body"`
+	DryRun bool               `query:"dry_run" doc:"Validate the request without sending"`
+	Body   email.BatchRequest `json:"body"`
 }
 type ListRequest struct {
 	Page int `query:"page" default:"0"`
@@ -98,9 +101,13 @@ func redactEmails(emails []models.Email) {
 
 func (h *EmailHandler) Send(c *okapi.Context, req *SendEmailRequest) error {
 	userID := c.GetInt("user_id")
-	apiKeyID := c.GetInt("api_key_id")
 	userEmail := c.GetString("user_email")
 
+	if req.DryRun {
+		return h.handleDryRun(c, userID, userEmail, req)
+	}
+
+	apiKeyID := c.GetInt("api_key_id")
 	resp, err := h.service.Send(c.Request().Context(), uint(userID), uint(apiKeyID), userEmail, &req.Body)
 	if err != nil {
 		if isRateLimitError(err) {
@@ -125,11 +132,39 @@ func (h *EmailHandler) Send(c *okapi.Context, req *SendEmailRequest) error {
 	return ok(c, resp)
 }
 
+func (h *EmailHandler) handleDryRun(c *okapi.Context, userID int, userEmail string, req *SendEmailRequest) error {
+	resp, err := h.service.ValidateSend(c.Request().Context(), uint(userID), userEmail, &req.Body)
+	if err != nil {
+		if isRateLimitError(err) {
+			return c.AbortTooManyRequests(err.Error())
+		}
+		if isDomainVerificationError(err) {
+			return c.AbortForbidden(err.Error())
+		}
+		return c.AbortBadRequest(err.Error())
+	}
+	return ok(c, resp)
+}
+
 func (h *EmailHandler) SendWithTemplate(c *okapi.Context, req *SendTemplateEmailRequest) error {
 	userID := c.GetInt("user_id")
-	apiKeyID := c.GetInt("api_key_id")
 	userEmail := c.GetString("user_email")
 
+	if req.DryRun {
+		resp, err := h.service.ValidateSendWithTemplate(c.Request().Context(), uint(userID), userEmail, &req.Body)
+		if err != nil {
+			if isRateLimitError(err) {
+				return c.AbortTooManyRequests(err.Error())
+			}
+			if isDomainVerificationError(err) {
+				return c.AbortForbidden(err.Error())
+			}
+			return c.AbortBadRequest(err.Error())
+		}
+		return ok(c, resp)
+	}
+
+	apiKeyID := c.GetInt("api_key_id")
 	resp, err := h.service.SendWithTemplate(c.Request().Context(), uint(userID), uint(apiKeyID), userEmail, &req.Body)
 	if err != nil {
 		if isRateLimitError(err) {
@@ -155,9 +190,20 @@ func (h *EmailHandler) SendWithTemplate(c *okapi.Context, req *SendTemplateEmail
 
 func (h *EmailHandler) SendBatch(c *okapi.Context, req *SendBatchEmailRequest) error {
 	userID := c.GetInt("user_id")
-	apiKeyID := c.GetInt("api_key_id")
 	userEmail := c.GetString("user_email")
 
+	if req.DryRun {
+		resp, err := h.service.ValidateSendBatch(c.Request().Context(), uint(userID), userEmail, &req.Body)
+		if err != nil {
+			if isRateLimitError(err) {
+				return c.AbortTooManyRequests(err.Error())
+			}
+			return c.AbortBadRequest(err.Error())
+		}
+		return ok(c, resp)
+	}
+
+	apiKeyID := c.GetInt("api_key_id")
 	resp, err := h.service.SendBatch(c.Request().Context(), uint(userID), uint(apiKeyID), userEmail, &req.Body)
 	if err != nil {
 		if isRateLimitError(err) {

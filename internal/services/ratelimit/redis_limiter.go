@@ -100,6 +100,32 @@ func (l *RedisLimiter) Allow(ctx context.Context, userEmail string) error {
 	return nil
 }
 
+// Check verifies the user is within rate limits without incrementing the counters.
+func (l *RedisLimiter) Check(ctx context.Context, userEmail string) error {
+	hourlyLimit, dailyLimit := l.effectiveLimits()
+
+	hourKey := fmt.Sprintf("ratelimit:hour:%s:%s", userEmail, time.Now().Format("2006010215"))
+	dayKey := fmt.Sprintf("ratelimit:day:%s:%s", userEmail, time.Now().Format("20060102"))
+
+	hourCount, err := l.client.Get(ctx, hourKey).Int64()
+	if err != nil && err != redis.Nil {
+		return fmt.Errorf("rate limit check failed: %w", err)
+	}
+	if hourCount >= int64(hourlyLimit) {
+		return fmt.Errorf("hourly rate limit exceeded (%d/%d)", hourCount, hourlyLimit)
+	}
+
+	dayCount, err := l.client.Get(ctx, dayKey).Int64()
+	if err != nil && err != redis.Nil {
+		return fmt.Errorf("rate limit check failed: %w", err)
+	}
+	if dayCount >= int64(dailyLimit) {
+		return fmt.Errorf("daily rate limit exceeded (%d/%d)", dayCount, dailyLimit)
+	}
+
+	return nil
+}
+
 // AllowLogin checks if a login attempt from the given IP is within rate limits.
 // The max attempts and window duration are configurable via admin settings.
 func (l *RedisLimiter) AllowLogin(ctx context.Context, ip string) error {
