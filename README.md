@@ -50,14 +50,26 @@ Response:
 * **HTTP Email API**
   Send single, batch, or template-based emails via REST endpoints.
 
+* **File Attachments**
+  Attach files to emails using base64-encoded content.
+
+* **Custom Headers & Unsubscribe**
+  Set custom email headers and automatic List-Unsubscribe support (URL and POST-based).
+
 * **Scheduled Delivery**
   Queue emails for delivery at a specified time.
+
+* **Email Preview**
+  Render and preview emails without sending via the API or dashboard.
+
+* **Email Status Polling**
+  Lightweight status endpoint for tracking delivery state of individual emails.
 
 * **Asynchronous Processing**
   Background workers process email queues using Redis and Asynq with priority tiers (transactional, bulk, and low-priority).
 
 * **Automatic Retry**
-  Failed emails are retried automatically with configurable retry limits per SMTP server.
+  Failed emails are retried automatically with configurable retry limits per SMTP server. Retry failed emails manually from the dashboard.
 
 * **Development Mode**
   Store and preview emails in the dashboard without sending them.
@@ -110,8 +122,14 @@ Response:
 * **Two-Factor Authentication**
   TOTP-based 2FA setup and verification.
 
+* **Session Management**
+  List active sessions, revoke individual sessions, or force-logout all other sessions.
+
 * **Rate Limiting**
   Redis-backed hourly and daily email limits per user.
+
+* **CORS Support**
+  Configurable allowed origins for cross-origin requests.
 
 ---
 
@@ -134,7 +152,13 @@ Response:
 ## Events and Webhooks
 
 * **Webhooks**
-  Subscribe to events such as `email.sent` and `email.failed`.
+  Subscribe to events such as `email.sent` and `email.failed` with HMAC-SHA256 signature verification.
+
+* **Webhook Delivery History**
+  Track delivery attempts, HTTP status codes, retry counts, and response details per webhook.
+
+* **Configurable Retries**
+  Set max retries and request timeout per webhook with exponential backoff.
 
 * **Audit Logs**
   Track platform and user activity with filtering and real-time streaming using Server-Sent Events.
@@ -147,10 +171,13 @@ Response:
   View daily email volume and status breakdown with date filtering.
 
 * **Dashboard Statistics**
-  Overview of delivery metrics and recent activity.
+  Delivery rate trends, bounce rate graphs, and latency percentiles.
+
+* **Daily Reports**
+  Opt-in daily email reports with sent/failed counts and delivery rate per user.
 
 * **Prometheus Metrics**
-  Export metrics including request counts, latencies, and email delivery counters.
+  Export metrics including request counts, latencies, email delivery counters, and webhook delivery stats.
 
 * **Health Probes**
   Liveness (`/healthz`) and readiness (`/readyz`) endpoints.
@@ -160,25 +187,44 @@ Response:
 ## Admin Panel
 
 * **User Management**
-  Create, deactivate, and manage users and roles.
+  Create, deactivate, and manage users and roles. Disable 2FA for users. View per-user metrics.
 
 * **Platform Metrics**
-  Aggregate statistics across the entire platform.
+  Aggregate statistics across the entire platform including total users, emails, bounces, and suppressed recipients.
 
 * **Shared SMTP Servers**
-  Manage SMTP servers available to all users.
+  Manage SMTP servers available to all users with domain allowlists and strict/permissive security modes.
+
+* **API Key Management**
+  List and revoke API keys across all users.
 
 * **Platform Email Logs**
   View and search emails across all users.
 
 * **Job Monitoring**
-  Track scheduled cron jobs such as retention cleanup and reports.
+  Track scheduled cron jobs such as retention cleanup and daily reports with execution history and error tracking.
 
 * **Platform Settings**
-  Configure registration, retention policies, and bounce handling.
+  Configure registration, retention policies (email logs, audit logs, webhook deliveries), and bounce handling.
 
 * **Real-time Event Streaming**
   Live audit log updates via Server-Sent Events.
+
+---
+
+## Data Management and GDPR
+
+* **User Data Export**
+  Export all user data (templates, stylesheets, contacts, contact lists, webhooks, suppressions, and settings) as JSON.
+
+* **User Data Import**
+  Import previously exported data with duplicate handling.
+
+* **GDPR Contact Deletion**
+  Delete specific contacts or all contacts with associated suppressions and list memberships.
+
+* **Email Log Cleanup**
+  Delete email logs and associated bounces older than a specified number of days.
 
 ---
 
@@ -187,8 +233,24 @@ Response:
 * **Vue.js Web Interface**
   Manage templates, SMTP servers, domains, API keys, contacts, webhooks, and email logs.
 
+* **Dark and Light Themes**
+  Toggle between dark and light mode.
+
 * **User Settings**
   Configure timezone, default sender, notification preferences, API key expiration, bounce handling, and daily reports.
+
+---
+
+## Deployment
+
+* **Embedded Worker Mode**
+  Run the background worker within the API server process using `POSTA_EMBEDDED_WORKER` for simpler deployments.
+
+* **Configurable Worker Concurrency**
+  Tune worker parallelism with `POSTA_WORKER_CONCURRENCY`.
+
+* **Automatic Database Migrations**
+  Schema is created and migrated automatically on startup.
 
 ---
 
@@ -214,7 +276,7 @@ Response:
 - Framework: [Okapi](https://github.com/jkaninda/okapi)
 - Database: PostgreSQL
 - Queue: Redis with [Asynq](https://github.com/hibiken/asynq)
-- Metrics:               Prometheus-compatible
+- Metrics: Prometheus-compatible
 ---
 
 # Requirements
