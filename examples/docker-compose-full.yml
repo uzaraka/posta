@@ -14,7 +14,7 @@
 
 services:
   posta:
-    image: goposta/posta:latest
+    image: jkaninda/posta:latest
     ports:
       - "9000:9000"
     environment:
@@ -42,7 +42,7 @@ services:
     restart: unless-stopped
 
   worker:
-    image: goposta/posta:latest
+    image: jkaninda/posta:latest
     command: ["worker"]
     environment:
       POSTA_DB_HOST: posta-db
