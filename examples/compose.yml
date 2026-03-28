@@ -7,7 +7,7 @@
 
 services:
   posta:
-    image: goposta/posta:latest
+    image: jkaninda/posta:latest
     ports:
       - "9000:9000"
     environment:

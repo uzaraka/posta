@@ -9,8 +9,8 @@
 [![Go](https://img.shields.io/github/go-mod/go-version/goposta/posta)](https://go.dev/)
 [![Go Reference](https://pkg.go.dev/badge/github.com/goposta/posta.svg)](https://pkg.go.dev/github.com/goposta/posta)
 [![GitHub Release](https://img.shields.io/github/v/release/goposta/posta)](https://github.com/goposta/posta/releases)
-![Docker Image Size (latest by date)](https://img.shields.io/docker/image-size/goposta/posta?style=flat-square)
-![Docker Pulls](https://img.shields.io/docker/pulls/goposta/posta?style=flat-square)
+![Docker Image Size (latest by date)](https://img.shields.io/docker/image-size/jkaninda/posta?style=flat-square)
+![Docker Pulls](https://img.shields.io/docker/pulls/jkaninda/posta?style=flat-square)
 
 **Posta** is a self-hosted email delivery platform that allows applications to send emails through HTTP APIs while Posta manages SMTP delivery, templates, storage, security, and analytics.
 
