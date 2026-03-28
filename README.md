@@ -361,55 +361,55 @@ Password: admin1234
 Posta includes a web dashboard for managing templates, SMTP servers, domains, contacts, API keys, and analytics.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/screenshots/dashboard.png" alt="Posta Dashboard" width="900"/>
+  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/static/img/screenshots/dashboard.png" alt="Posta Dashboard" width="900"/>
 </p>
 
 ### Email Analytics
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/screenshots/analytics.png" alt="Email Analytics" width="900"/>
+  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/static/img/screenshots/analytics.png" alt="Email Analytics" width="900"/>
 </p>
 
 ### Email Logs
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/screenshots/email-logs.png" alt="Email Logs" width="900"/>
+  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/static/img/screenshots/email-logs.png" alt="Email Logs" width="900"/>
 </p>
 
 ### Email Detail
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/screenshots/email-detail.png" alt="Email Detail" width="900"/>
+  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/static/img/screenshots/email-detail.png" alt="Email Detail" width="900"/>
 </p>
 
 ### Template Detail
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/screenshots/template-detail.png" alt="Template Detail" width="900"/>
+  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/static/img/screenshots/template-detail.png" alt="Template Detail" width="900"/>
 </p>
 
 ### Template Editor
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/screenshots/template-preview.png" alt="Template Preview" width="900"/>
+  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/static/img/screenshots/template-preview.png" alt="Template Preview" width="900"/>
 </p>
 
 ### Admin Platform Metrics
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/screenshots/admin-platform-metrics.png" alt="Admin Platform Metrics" width="900"/>
+  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/static/img/screenshots/admin-platform-metrics.png" alt="Admin Platform Metrics" width="900"/>
 </p>
 
 ### Admin Platform Metrics (Dark)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/screenshots/admin-metrics-light.png" alt="Admin Metrics Light" width="900"/>
+  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/static/img/screenshots/admin-metrics-light.png" alt="Admin Metrics Light" width="900"/>
 </p>
 
 ### Admin Metrics (Dark)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/screenshots/admin-metrics-dark.png" alt="Admin Metrics Dark" width="900"/>
+  <img src="https://raw.githubusercontent.com/goposta/posta/main/docs/static/img/screenshots/admin-metrics-dark.png" alt="Admin Metrics Dark" width="900"/>
 </p>
 
 ---
