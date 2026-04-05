@@ -4,14 +4,18 @@ import { useRoute, useRouter } from 'vue-router'
 import { adminApi } from '../../api/admin'
 import { plansApi } from '../../api/plans'
 import { useNotificationStore } from '../../stores/notification'
+import { useConfirm } from '../../composables/useConfirm'
 import type { UserDetailMetrics, AdminWorkspace, Plan } from '../../api/types'
 
 const route = useRoute()
 const router = useRouter()
 const notification = useNotificationStore()
+const { confirm } = useConfirm()
 const loading = ref(true)
 const metrics = ref<UserDetailMetrics | null>(null)
 const disabling2FA = ref(false)
+const deleting = ref(false)
+const cancellingDeletion = ref(false)
 const workspaces = ref<AdminWorkspace[]>([])
 const plans = ref<Plan[]>([])
 const changingPlan = ref<number | null>(null)
@@ -35,7 +39,14 @@ onMounted(async () => {
 })
 
 async function handleDisable2FA() {
-  if (!metrics.value || !confirm('Are you sure you want to disable 2FA for this user?')) return
+  if (!metrics.value) return
+  const confirmed = await confirm({
+    title: 'Disable 2FA',
+    message: 'Are you sure you want to disable 2FA for this user?',
+    confirmText: 'Disable 2FA',
+    variant: 'danger',
+  })
+  if (!confirmed) return
   disabling2FA.value = true
   try {
     await adminApi.disable2FA(metrics.value.user.id)
@@ -45,6 +56,45 @@ async function handleDisable2FA() {
     notification.error('Failed to disable 2FA.')
   } finally {
     disabling2FA.value = false
+  }
+}
+
+async function handleDeleteUser() {
+  if (!metrics.value) return
+  const confirmed = await confirm({
+    title: 'Delete User',
+    message: `Are you sure you want to delete "${metrics.value.user.email}"? The account will be disabled immediately and permanently deleted after 7 days.`,
+    confirmText: 'Delete User',
+    variant: 'danger',
+  })
+  if (!confirmed) return
+  deleting.value = true
+  try {
+    await adminApi.deleteUser(metrics.value.user.id)
+    const res = await adminApi.getUserMetrics(metrics.value.user.id)
+    metrics.value = res.data.data
+    notification.success('Account disabled and scheduled for deletion.')
+  } catch (e: any) {
+    const message = e?.response?.data?.error?.message || 'Failed to delete user'
+    notification.error(message)
+  } finally {
+    deleting.value = false
+  }
+}
+
+async function handleCancelDeletion() {
+  if (!metrics.value) return
+  cancellingDeletion.value = true
+  try {
+    await adminApi.cancelUserDeletion(metrics.value.user.id)
+    metrics.value.user.scheduled_deletion_at = null
+    metrics.value.user.active = true
+    notification.success('Account deletion cancelled.')
+  } catch (e: any) {
+    const message = e?.response?.data?.error?.message || 'Failed to cancel deletion'
+    notification.error(message)
+  } finally {
+    cancellingDeletion.value = false
   }
 }
 
@@ -111,10 +161,19 @@ function formatDate(date: string) {
                 <td><span :class="roleBadgeClass(metrics.user.role)">{{ metrics.user.role }}</span></td>
               </tr>
               <tr>
+                <td style="font-weight: 600;">Auth Type</td>
+                <td>
+                  <span class="badge badge-neutral">{{ metrics.user.auth_method || 'password' }}</span>
+                </td>
+              </tr>
+              <tr>
                 <td style="font-weight: 600;">Status</td>
                 <td>
                   <span :class="metrics.user.active ? 'badge badge-success' : 'badge badge-danger'">
                     {{ metrics.user.active ? 'Active' : 'Disabled' }}
+                  </span>
+                  <span v-if="metrics.user.scheduled_deletion_at" class="badge badge-danger" style="margin-left: 8px;">
+                    Scheduled for deletion on {{ formatDate(metrics.user.scheduled_deletion_at) }}
                   </span>
                 </td>
               </tr>
@@ -144,6 +203,33 @@ function formatDate(date: string) {
               </tr>
             </tbody>
           </table>
+
+          <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--color-border);">
+            <div v-if="metrics.user.scheduled_deletion_at" style="display: flex; align-items: center; gap: 12px;">
+              <button
+                class="btn btn-primary"
+                :disabled="cancellingDeletion"
+                @click="handleCancelDeletion"
+              >
+                {{ cancellingDeletion ? 'Cancelling...' : 'Cancel Scheduled Deletion' }}
+              </button>
+              <span style="color: var(--color-text-muted); font-size: 0.875rem;">
+                This will re-enable the account and cancel the scheduled deletion.
+              </span>
+            </div>
+            <div v-else style="display: flex; align-items: center; gap: 12px;">
+              <button
+                class="btn btn-danger"
+                :disabled="deleting"
+                @click="handleDeleteUser"
+              >
+                {{ deleting ? 'Deleting...' : 'Delete User' }}
+              </button>
+              <span style="color: var(--color-text-muted); font-size: 0.875rem;">
+                The account will be disabled and permanently deleted after 7 days.
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 

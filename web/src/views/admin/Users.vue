@@ -124,17 +124,18 @@ async function toggleActive(user: User) {
 async function deleteUser(user: User) {
   const confirmed = await confirm({
     title: 'Delete User',
-    message: `Are you sure you want to delete "${user.email}"? This action cannot be undone. All associated data will be permanently removed.`,
+    message: `Are you sure you want to delete "${user.email}"? The account will be disabled immediately and permanently deleted after 7 days.`,
     confirmText: 'Delete User',
     variant: 'danger',
   })
   if (!confirmed) return
   try {
     await adminApi.deleteUser(user.id)
-    notify.success('User deleted')
+    notify.success('Account disabled and scheduled for deletion.')
     await loadUsers()
-  } catch (e) {
-    notify.error('Failed to delete user')
+  } catch (e: any) {
+    const message = e?.response?.data?.error?.message || 'Failed to delete user'
+    notify.error(message)
   }
 }
 const { watchClickStart, confirmClickEnd } = useModalSafeClose(() => {
