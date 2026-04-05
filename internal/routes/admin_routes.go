@@ -98,6 +98,19 @@ func (r *Router) adminRoutes() []okapi.RouteDefinition {
 			},
 		},
 		{
+			Method:      http.MethodPost,
+			Path:        "/users/{id:int}/cancel-deletion",
+			Handler:     okapi.H(r.h.admin.CancelUserDeletion),
+			Group:       adminGroup,
+			Summary:     "Cancel user deletion",
+			Description: "Cancel a scheduled account deletion and re-enable the user (admin only)",
+			Response:    &dto.Response[okapi.M]{},
+			Options: []okapi.RouteOption{
+				okapi.DocPathParam("id", "integer", "User ID"),
+				okapi.DocErrorResponse(404, &dto.ErrorResponseBody{}),
+			},
+		},
+		{
 			Method:      http.MethodDelete,
 			Path:        "/users/{id:int}/2fa",
 			Handler:     okapi.H(r.h.admin.Disable2FA),

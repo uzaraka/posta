@@ -104,6 +104,19 @@ func (r *UserRepository) DeleteAllUserData(userID uint) error {
 			"user_settings",
 			"oauth_accounts",
 		}
+
+		var contactListIDs []uint
+		if err := tx.Raw("SELECT id FROM contact_lists WHERE user_id = ?", userID).Scan(&contactListIDs).Error; err != nil {
+			return err
+		}
+		if len(contactListIDs) > 0 {
+			if err := tx.Exec("DELETE FROM contact_list_members WHERE list_id IN ?", contactListIDs).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Exec("DELETE FROM contact_lists WHERE user_id = ?", userID).Error; err != nil {
+			return err
+		}
 		for _, table := range tables {
 			if err := tx.Exec("DELETE FROM "+table+" WHERE user_id = ?", userID).Error; err != nil {
 				return err

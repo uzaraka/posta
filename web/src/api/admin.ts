@@ -14,6 +14,9 @@ export const adminApi = {
   deleteUser(id: number) {
     return api.delete(`/admin/users/${id}`)
   },
+  cancelUserDeletion(id: number) {
+    return api.post<ApiResponse<{ message: string }>>(`/admin/users/${id}/cancel-deletion`)
+  },
   getUserMetrics(id: number) {
     return api.get<ApiResponse<UserDetailMetrics>>(`/admin/users/${id}/metrics`)
   },

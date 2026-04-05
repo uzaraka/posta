@@ -33,6 +33,8 @@ export interface User {
   role: 'admin' | 'user'
   active: boolean
   two_factor_enabled: boolean
+  auth_method: string
+  scheduled_deletion_at: string | null
   created_at: string
   last_login_at: string | null
 }

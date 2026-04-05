@@ -206,29 +206,69 @@ func (h *AdminHandler) UpdateUser(c *okapi.Context, req *AdminUpdateUserRequest)
 	return ok(c, user)
 }
 
-// DeleteUser deletes a user (admin only).
+// DeleteUser schedules a user for deletion (admin only).
 func (h *AdminHandler) DeleteUser(c *okapi.Context, req *AdminDeleteUserRequest) error {
 	currentUserID := c.GetInt("user_id")
 	if req.ID == currentUserID {
 		return c.AbortBadRequest("cannot delete your own account")
 	}
 
-	_, err := h.userRepo.FindByID(uint(req.ID))
+	user, err := h.userRepo.FindByID(uint(req.ID))
 	if err != nil {
 		return c.AbortNotFound("user not found")
 	}
 
-	if err := h.userRepo.DeleteAllUserData(uint(req.ID)); err != nil {
-		return c.AbortInternalServerError("failed to delete user")
+	if user.ScheduledDeletionAt != nil {
+		return c.AbortBadRequest("account deletion is already scheduled")
+	}
+
+	deletionDate := time.Now().Add(7 * 24 * time.Hour)
+	user.ScheduledDeletionAt = &deletionDate
+	user.Active = false
+
+	if err := h.userRepo.Update(user); err != nil {
+		return c.AbortInternalServerError("failed to schedule account deletion")
 	}
 
 	if h.bus != nil {
 		adminID := uint(c.GetInt("user_id"))
-		h.bus.PublishSimple(models.EventCategoryUser, "user.deleted", &adminID, c.GetString("email"), c.RealIP(),
-			fmt.Sprintf("User ID %d deleted", req.ID), map[string]any{"deleted_user_id": req.ID})
+		h.bus.PublishSimple(models.EventCategoryUser, "user.deletion_scheduled", &adminID, c.GetString("email"), c.RealIP(),
+			fmt.Sprintf("User ID %d scheduled for deletion on %s", req.ID, deletionDate.Format("2006-01-02")),
+			map[string]any{"deleted_user_id": req.ID, "scheduled_deletion_at": deletionDate})
 	}
 
-	return noContent(c)
+	return ok(c, map[string]any{
+		"message":               "Account disabled and scheduled for deletion",
+		"scheduled_deletion_at": deletionDate,
+	})
+}
+
+// CancelUserDeletion cancels a scheduled account deletion (admin only).
+func (h *AdminHandler) CancelUserDeletion(c *okapi.Context, req *AdminDeleteUserRequest) error {
+	user, err := h.userRepo.FindByID(uint(req.ID))
+	if err != nil {
+		return c.AbortNotFound("user not found")
+	}
+
+	if user.ScheduledDeletionAt == nil {
+		return c.AbortBadRequest("no deletion is scheduled for this account")
+	}
+
+	user.ScheduledDeletionAt = nil
+	user.Active = true
+
+	if err := h.userRepo.Update(user); err != nil {
+		return c.AbortInternalServerError("failed to cancel account deletion")
+	}
+
+	if h.bus != nil {
+		adminID := uint(c.GetInt("user_id"))
+		h.bus.PublishSimple(models.EventCategoryUser, "user.deletion_cancelled", &adminID, c.GetString("email"), c.RealIP(),
+			fmt.Sprintf("Scheduled deletion cancelled for user ID %d", req.ID),
+			map[string]any{"user_id": req.ID})
+	}
+
+	return ok(c, map[string]any{"message": "Account deletion cancelled"})
 }
 
 // ListAllEmails returns all emails across all users (admin only).
