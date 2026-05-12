@@ -184,7 +184,7 @@ function getIcon(name: string): string {
             </router-link>
 
           </div>
-          <div v-if="user?.role === 'admin'" class="nav-section">
+          <div v-if="auth.isAdmin" class="nav-section">
             <div class="nav-section-title">Admin</div>
             <router-link v-for="item in adminItems" :key="item.path" class="nav-item"
               :class="{ active: isActive(item.path) }" :title="sidebarCollapsed ? item.name : ''" :to="item.path">
@@ -392,7 +392,7 @@ function getIcon(name: string): string {
           </div>
 
           <!-- Admin section -->
-          <div v-if="user?.role === 'admin'" class="nav-section">
+          <div v-if="auth.isAdmin" class="nav-section">
             <div class="nav-section-title">Admin</div>
             <router-link v-for="item in adminItems" :key="item.path" class="nav-item"
               :class="{ active: isActive(item.path) }" @click="mobileOpen = false" :to="item.path">
