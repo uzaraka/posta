@@ -430,8 +430,19 @@ onMounted(loadAll);
                 <td>
                   <code class="template-id">{{ template.id }}</code>
                   <button class="btn-copy" @click="copyTemplateId" :title="idCopied ? 'Copied!' : 'Copy ID'">
-                    <span v-if="idCopied">&#10003;</span>
-                    <span v-else>&#128203;</span>
+                    <template v-if="idCopied">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </template>
+                    <template v-else>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                      </svg>
+                    </template>
                   </button>
                   <span v-if="idCopied" class="copied-label">Copied!</span>
                 </td>

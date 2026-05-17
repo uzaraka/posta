@@ -632,7 +632,7 @@ onMounted(() => { loadSessions() })
       </div>
 
       <!-- Danger Zone -->
-      <div class="card danger-card" v-if="auth.user?.role !== 'admin'">
+      <div class="card danger-card" v-if="!auth.isAdmin">
         <div class="card-header"><h2>Danger Zone</h2></div>
         <div class="card-body">
           <!-- Deletion already scheduled -->

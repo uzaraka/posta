@@ -173,7 +173,7 @@ const avgDeliveryRate = computed(() => {
           </div>
           <div class="form-group">
             <label class="form-label">Status</label>
-            <select v-model="statusFilter" class="form-input">
+            <select v-model="statusFilter" class="form-select">
               <option value="">All</option>
               <option value="sent">Sent</option>
               <option value="failed">Failed</option>
