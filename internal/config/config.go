@@ -302,6 +302,7 @@ func (c *Config) Initialize(app *okapi.Okapi) error {
 			},
 			Servers:         apiServers,
 			SecuritySchemes: c.securitySchemes,
+			UI:              okapi.ScalarUI,
 		})
 	}
 	app.WithErrorHandler(errorhandlers.CustomErrorHandler())

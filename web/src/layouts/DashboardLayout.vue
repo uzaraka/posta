@@ -199,13 +199,14 @@ function getIcon(name: string): string {
           <template v-if="appInfo?.openapi_docs">
             <div class="nav-section-title">Docs</div>
             <a class="nav-item" href="/docs" target="_blank" rel="noopener noreferrer"
-              :title="sidebarCollapsed ? 'Swagger UI' : ''">
+              :title="sidebarCollapsed ? 'Scalar UI' : ''">
               <span class="nav-icon" v-html="getIcon('book-open')"></span>
-              <span class="nav-label">Swagger UI</span>
+              <span class="nav-label">Scalar UI</span>
             </a>
-            <a class="nav-item" href="/redoc" target="_blank" rel="noopener noreferrer">
+            <a class="nav-item" href="/swagger" target="_blank" rel="noopener noreferrer"
+              :title="sidebarCollapsed ? 'Swagger UI' : ''">
               <span class="nav-icon" v-html="getIcon('file-text')"></span>
-              <span class="nav-label">Redoc</span>
+              <span class="nav-label">Swagger UI</span>
             </a>
           </template>
 
