@@ -623,14 +623,6 @@ func (s *Service) Send(ctx context.Context, userID, apiKeyID uint, workspaceID *
 		return nil, fmt.Errorf("failed to store email: %w", err)
 	}
 
-	// Auto-attach an RFC 8058 one-click unsubscribe URL for transactional sends
-	// when the caller did not supply their own.
-	if em.ListUnsubscribeURL == "" && s.txUnsubGen != nil {
-		em.ListUnsubscribeURL = s.txUnsubGen.TxUnsubscribeURL(em.ID)
-		em.ListUnsubscribePost = true
-		_ = s.emailRepo.Update(em)
-	}
-
 	if s.devMode {
 		em.Status = models.EmailStatusSent
 		now := time.Now()
