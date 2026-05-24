@@ -108,7 +108,7 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 function schedulePreview() {
   if (debounceTimer) clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => renderPreview(), 600)
+  debounceTimer = setTimeout(() => renderPreview(), 300)
 }
 
 async function renderPreview() {
@@ -126,8 +126,11 @@ async function renderPreview() {
   }
 
   try {
-    const res = await templatesApi.previewLocalization(templateId, versionId, {
-      language: localization.value?.language || template.value.default_language,
+    const res = await templatesApi.previewTemplate({
+      subject_template: subjectValue.value || ' ',
+      html_template: htmlValue.value,
+      text_template: textValue.value,
+      stylesheet_id: version.value?.stylesheet_id ?? null,
       template_data: data,
     })
     preview.value = res.data.data
